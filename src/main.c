@@ -1,6 +1,7 @@
 #include "Sim.h"
 #include "model.h"
 #include "matrix.h"
+#include "UAVCtrl.h"
 #include <windows.h>
 #include <mmsystem.h>
 #include <math.h>
@@ -58,7 +59,6 @@ void ctrl_task(void) {
         default:
             break;
     }
-    //	ctrl_cmdSmooth();
     ctrl_long();
     ctrl_late();
 }
@@ -169,7 +169,8 @@ void main(void) {
                 "|psi: %8.4lf |PN: %8.4lf |H: %8.4lf\n",
                 t, ac_phi * Rad2Deg, ac_theta * Rad2Deg, ac_psi * Rad2Deg, ac_PN, ac_H);
         }
-        fprintf(fp, "%lf %lf %lf %lf %lf %lf %lf\n", t, ac_phi * Rad2Deg, ac_theta * Rad2Deg, -ac_psi * Rad2Deg, ac_PN, ac_PE, ac_H);
+        fprintf(fp, "%lf %lf %lf %lf %lf %lf %lf\n", t, ac_phi * Rad2Deg, ac_theta * Rad2Deg, -ac_psi * Rad2Deg, ac_PN,
+                ac_PE, ac_H);
     };
     fclose(fp);
 }
