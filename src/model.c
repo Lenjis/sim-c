@@ -17,9 +17,9 @@ static double uav_CD(double alpha_deg);
 static double uav_CL0(double alpha_deg);
 static double uav_CY(void);
 static double uav_CM(double alpha_deg);
-static double uav_interp1(double *A, double Dim1[], int Len1, double X1);
-static double uav_interp2(double *A, double Dim1[], int Len1, double X1, double Dim2[], int Len2, double X2);
-static double uav_interp3(double *A, double Dim1[], int Len1, double X1, double Dim2[], int Len2, double X2,
+static double uav_interp1(double *A, double idx[], int Len1, double xi);
+static double uav_interp2(double *A, double idx[], int Len1, double xi, double Dim2[], int Len2, double X2);
+static double uav_interp3(double *A, double idx[], int Len1, double xi, double Dim2[], int Len2, double X2,
                           double Dim3[], int Len3, double X3);
 static int uav_find(double A[], double X, int len);
 
@@ -179,6 +179,7 @@ void model6dof(double t, double x[], double u[], double dx[], int dim) {
 
 // Return air density and mach number
 //=============================================================================
+
 static void uav_density(double H, double VT, double *ru, double *mach) {
     double T, PP, RR, TS, sonic;
     const double K = 34.163195;
@@ -223,67 +224,40 @@ static void uav_density(double H, double VT, double *ru, double *mach) {
 // return drag coefficient
 //=============================================================================
 static double uav_CD(double alpha_deg) {
-    static double IDX_alpha[14] = {-4.0, -2.0, 0.0, 2.0, 4.0, 6.0, 8.0, 10.0, 12.0, 14.0, 16.0, 18.0, 20.0};
+    static double IDX_alpha[14] = {-4.0, -2.0, 0.0, 2.0, 4.0, 8.0, 12.0, 16.0, 20.0};
     static double TBL_CD[14] = {0.026, 0.024, 0.024, 0.028, 0.036, 0.061, 0.102, 0.141, 0.173};
-    return uav_interp1(TBL_CD, IDX_alpha, 14, alpha_deg);
+    return uav_interp1(TBL_CD, IDX_alpha, 9, alpha_deg);
 }
 
 // return lift coefficient
 //=============================================================================
 static double uav_CL0(double alpha_deg) {
-    static double IDX_alpha[14] = {-4.0, -2.0, 0.0, 2.0, 4.0, 6.0, 8.0, 10.0, 12.0, 14.0, 16.0, 18.0, 20.0};
+    static double IDX_alpha[14] = {-4.0, -2.0, 0.0, 2.0, 4.0, 8.0, 12.0, 16.0, 20.0};
     static double TBL_CL0[14] = {-0.219, -0.04, 0.139, 0.299, 0.455, 0.766, 1.083, 1.409, 1.743};
-    return uav_interp1(TBL_CL0, IDX_alpha, 14, alpha_deg);
+    return uav_interp1(TBL_CL0, IDX_alpha, 9, alpha_deg);
 }
 
 static double uav_CY() { return -0.00909; }
 
 static double uav_CM(double alpha_deg) {
-    static double IDX_alpha[14] = {-4.0, -2.0, 0.0, 2.0, 4.0, 6.0, 8.0, 10.0, 12.0, 14.0, 16.0, 18.0, 20.0};
+    static double IDX_alpha[14] = {-4.0, -2.0, 0.0, 2.0, 4.0, 8.0, 12.0, 16.0, 20.0};
     static double TBL_CM0[14] = {0.1161, 0.0777, 0.0393, 0.0009, -0.0375, -0.0759, -0.1527, -0.2295, -0.3063};
-    return uav_interp1(TBL_CM0, IDX_alpha, 14, alpha_deg);
+    return uav_interp1(TBL_CM0, IDX_alpha, 9, alpha_deg);
 }
 
-static double uav_interp1(double *A, double Dim1[], int Len1, double X1) {
+static double uav_interp1(double *A, double idx[], int Len1, double xi) {
     int r;
     double DA, Y;
 
-    r = uav_find(Dim1, X1, Len1);
-    DA = (X1 - Dim1[r]) / (Dim1[r + 1] - Dim1[r]);
+    if (xi < idx[0])
+        r = 0;
+    else if (xi < idx[Len1 - 1])
+        r = uav_find(idx, xi, Len1);
+    else
+        r = Len1 - 2;
+
+    DA = (xi - idx[r]) / (idx[r + 1] - idx[r]);
     Y = A[r] + (A[r + 1] - A[r]) * DA;
-    return (Y);
-}
-
-// uav_interp2
-//=============================================================================
-static double uav_interp2(double *A, double Dim1[], int Len1, double X1, double Dim2[], int Len2, double X2) {
-    int r;
-    double *SUB1, DA, V, W, Y;
-
-    r = uav_find(Dim1, X1, Len1);
-    DA = (X1 - Dim1[r]) / (Dim1[r + 1] - Dim1[r]);
-    SUB1 = A + Len2 * r;
-    V = uav_interp1(SUB1, Dim2, Len2, X2);
-    SUB1 = A + Len2 * (r + 1);
-    W = uav_interp1(SUB1, Dim2, Len2, X2);
-    Y = V + (W - V) * DA;
-    return (Y);
-}
-//=============================================================================
-// uav_interp3
-//=============================================================================
-static double uav_interp3(double *A, double Dim1[], int Len1, double X1, double Dim2[], int Len2, double X2,
-                          double Dim3[], int Len3, double X3) {
-    static int r;
-    static double *SUB2, DA, V, W, Y;
-
-    r = uav_find(Dim1, X1, Len1);
-    DA = (X1 - Dim1[r]) / (Dim1[r + 1] - Dim1[r]);
-    SUB2 = A + Len2 * Len3 * r;
-    V = uav_interp2(SUB2, Dim2, Len2, X2, Dim3, Len3, X3);
-    SUB2 = A + Len2 * Len3 * (r + 1);
-    W = uav_interp2(SUB2, Dim2, Len2, X2, Dim3, Len3, X3);
-    Y = V + (W - V) * DA;
     return (Y);
 }
 
