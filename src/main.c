@@ -109,18 +109,18 @@ void simu_run(void) {
 
 /*飞行器模型解算初始化，无需看懂*/
 void simu_init(void) {
-    ac_Vt = 35;
-    ac_alpha = 5 / Rad2Deg;
+    ac_Vt = 25;
+    ac_alpha = 2.7480 / Rad2Deg;
     ac_beta = 0 / Rad2Deg;
     ac_phi = 0.0 / Rad2Deg;
-    ac_theta = 5 / Rad2Deg;
+    ac_theta = 2.7480 / Rad2Deg;
     ac_psi = 0.0 / Rad2Deg;
     ac_P = 0 / Rad2Deg;
     ac_Q = 0 / Rad2Deg;
     ac_R = 0 / Rad2Deg;
     ac_PN = 0.0 / Rad2Deg;
     ac_PE = 0.0 / Rad2Deg;
-    ac_H = 1000;
+    ac_H = 500;
 
     sim_step = 5;  // 5ms
     sim_status = 0;

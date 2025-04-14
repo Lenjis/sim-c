@@ -19,7 +19,8 @@ static double uav_CY(void);
 static double uav_CM(double alpha_deg);
 static double uav_interp1(double *A, double Dim1[], int Len1, double X1);
 static double uav_interp2(double *A, double Dim1[], int Len1, double X1, double Dim2[], int Len2, double X2);
-static double uav_interp3(double *A, double Dim1[], int Len1, double X1, double Dim2[], int Len2, double X2, double Dim3[], int Len3, double X3);
+static double uav_interp3(double *A, double Dim1[], int Len1, double X1, double Dim2[], int Len2, double X2,
+                          double Dim3[], int Len3, double X3);
 static int uav_find(double A[], double X, int len);
 
 void model6dof(double t, double x[], double u[], double dx[], int dim) {
@@ -32,6 +33,7 @@ void model6dof(double t, double x[], double u[], double dx[], int dim) {
     double ru, mach, qs;
     double U, V, W;
     double CD, CL0, CM0, D, L, Y;
+    double Lbar, M, N;
 
     const double CL_ele = 0.00636;
     const double CY_beta = -0.00909;
@@ -58,7 +60,7 @@ void model6dof(double t, double x[], double u[], double dx[], int dim) {
     rud = u[2];  // aileron  deflection angle [deg]
     eng = u[3];  // engine input
 
-    //if (Vt < 0.1) Vt = 0.1;
+    // if (Vt < 0.1) Vt = 0.1;
     uav_density(H, Vt, &ru, &mach);  // [air density] [mach number]
     qs = SA * (ru * Vt * Vt / 2);    // [Dynamic pressure](kg/m^2)
 
@@ -79,6 +81,7 @@ void model6dof(double t, double x[], double u[], double dx[], int dim) {
     U = Vt * calpha * cbeta;
     V = Vt * sbeta;
     W = Vt * salpha * cbeta;
+    double uvw[3] = {U, V, W};  // [u,v,w]  ----- body axis velocity
 
     Pow = eng / 100 * (mass * g * 4.0);
 
@@ -86,11 +89,13 @@ void model6dof(double t, double x[], double u[], double dx[], int dim) {
     double J_inv[3][3] = {{-Izz / (Ixz * Ixz - Ixx * Izz), 0, -Ixz / (Ixz * Ixz - Ixx * Izz)},
                           {0, 1 / Iyy, 0},
                           {-Ixz / (Ixz * Ixz - Ixx * Izz), 0, -Ixx / (Ixz * Ixz - Ixx * Izz)}};
-    double S[3][3] = {{calpha * cbeta, -calpha * sbeta, -salpha}, {sbeta, cbeta, 0}, {salpha * cbeta, -salpha * sbeta, calpha}};  // [rotation matrix]
-    double B[3][3] = {{ctheta * cpsi, ctheta * spsi, -stheta},
-                      {sphi * stheta * cpsi - cphi * spsi, sphi * stheta * spsi + cphi * cpsi, sphi * ctheta},
-                      {cphi * stheta * cpsi + sphi * spsi, cphi * stheta * spsi - sphi * cpsi, cphi * ctheta}};  // [rotation matrix]
-    double uvw[3] = {U, V, W};                                                                                   // [u,v,w]  ----- body axis velocity
+    double S[3][3] = {{calpha * cbeta, -calpha * sbeta, -salpha},
+                      {sbeta, cbeta, 0},
+                      {salpha * cbeta, -salpha * sbeta, calpha}};  // [rotation matrix]
+    double B[3][3] = {
+        {ctheta * cpsi, ctheta * spsi, -stheta},
+        {sphi * stheta * cpsi - cphi * spsi, sphi * stheta * spsi + cphi * cpsi, sphi * ctheta},
+        {cphi * stheta * cpsi + sphi * spsi, cphi * stheta * spsi - sphi * cpsi, cphi * ctheta}};  // [rotation matrix]
     double pqr[3] = {P, Q, R};      // [roll rate] [yaw rate] [pitch rate]
     double Pow_v[3] = {Pow, 0, 0};  // [thrust vector]
 
@@ -102,7 +107,7 @@ void model6dof(double t, double x[], double u[], double dx[], int dim) {
 
     D = qs * CD;
     Y = qs * CY_beta * beta_deg;
-    L = qs * (CL0 + (CL_ele * ele));
+    L = qs * (CL0 + CL_ele * ele);
 
     double F0_v[3] = {-D, Y, -L};  // [force vector]
     double F_v[3];
@@ -124,27 +129,23 @@ void model6dof(double t, double x[], double u[], double dx[], int dim) {
     dW = duvw[2];
 
     dVt = (U * dU + V * dV + W * dW) / Vt;
-    dbeta = (dV * Vt - V * dVt) / (Vt * Vt * cbeta * cbeta);
+    dbeta = (dV * Vt - V * dVt) / (Vt * Vt * cbeta);
     dalpha = (U * dW - W * dU) / (U * U + W * W);
 
-    double Lbar = qs * b * (CR_beta * beta_deg + CR_ail * ail + CR_rud * rud + (CR_P * P + CR_R * R) * b / Vt / 2.0);
+    Lbar = qs * b * (CR_beta * beta_deg + CR_ail * ail + CR_rud * rud + (CR_P * P + CR_R * R) * b / Vt / 2.0);
+    M = qs * cbar * (CM0 + CM_ele * ele + CM_Q * Q * cbar / Vt / 2.0);
+    N = qs * b * (CN_beta * beta_deg + CN_ail * ail + CN_rud * rud + (CN_P * P + CN_R * R) * b / Vt / 2.0);
 
-    double M = qs * cbar * (CM0 + CM_ele * ele + (CM_Q * Q) * cbar / Vt / 2.0);
-
-    double N = qs * b * (CN_beta * beta_deg + CN_ail * ail + CN_rud * rud + (CN_P * P + CN_R * R) * b / Vt / 2.0);
-
-    // calculate dpqr
+    // dpqr = inv(J) * (-cross(pqr, (J * pqr)) + [Lbar; M; N]);
     double dpqr[3];
-
     double v3[3];
     multiply(&J[0][0], pqr, v3, 3, 3, 3, 1);  // v3 = J*pqr
-    vector3 v1_v = {v3[0], v3[1], v3[2]};
-    vector3 c3 = cross(pqr_v, v1_v);  // c3 = pqr x (J*pqr)
-    double v4[3] = {c3.x, c3.y, c3.z};
-    multiply(&J_inv[0][0], v4, dpqr, 3, 3, 3,
-             1);  // dpqr = J_inv*(pqr x (J*pqr))
-    double c4[3] = {Lbar, M, N};
-    add(dpqr, c4, dpqr, 3, 1);  // dpqr = J_inv*(pqr x (J*pqr)) + [Lbar,M,N]
+    vector3 v3_v = {v3[0], v3[1], v3[2]};
+    vector3 c4 = cross(pqr_v, v3_v);
+    double v4[3] = {-c4.x, -c4.y, -c4.z};          // v4 = -pqr x (J*pqr)
+    multiply(&J_inv[0][0], v4, dpqr, 3, 3, 3, 1);  // J_inv * -(pqr x (J*pqr))
+    double v5[3] = {Lbar, M, N};
+    add(dpqr, v5, dpqr, 3, 1);  // dpqr = J_inv*(pqr x (J*pqr)) + [Lbar,M,N]
     dP = dpqr[0];
     dQ = dpqr[1];
     dR = dpqr[2];
@@ -153,10 +154,11 @@ void model6dof(double t, double x[], double u[], double dx[], int dim) {
     dtheta = Q * cphi - R * sphi;
     dpsi = (Q * sphi + R * cphi) / ctheta;
 
+    // dVe = B' * uvw;
     double B_t[3][3];
-    transpose(&B[0][0], &B_t[0][0], 3, 3);  // [rotation matrix]
+    transpose(&B[0][0], &B_t[0][0], 3, 3);  // B_t = B^T
     double dVe[3];
-    multiply(&B_t[0][0], uvw, dVe, 3, 3, 3, 1);  // dVe = B^T*uvw
+    multiply(&B_t[0][0], uvw, dVe, 3, 3, 3, 1);  // dVe = B^T * uvw
     dPN = dVe[0];
     dPE = dVe[1];
     dH = -dVe[2];  // [dVe] = [dPN,dPE,dH]
@@ -178,16 +180,44 @@ void model6dof(double t, double x[], double u[], double dx[], int dim) {
 // Return air density and mach number
 //=============================================================================
 static void uav_density(double H, double VT, double *ru, double *mach) {
-    double temp;
-    if (H < 11000.0) {
-        temp = 1.0 - 0.0225569 * H / 1000.0;
-        *ru = 0.12492 * 9.8 * exp(4.255277 * log(temp));
-        *mach = VT / 340.375 / sqrt(temp);
+    double T, PP, RR, TS, sonic;
+    const double K = 34.163195;
+    const double RL = 1.225;
+    const double C1 = 0.001;
+    const double AL = 340.294;
+    const double BT = 1.458E-06;
+
+    H = C1 * H / (1 + C1 * H / 6356.766);
+
+    if (H < 11) {
+        T = 288.15 - 6.5 * H;
+        PP = pow(288.15 / T, -K / 6.5);
+    } else if (H < 20) {
+        T = 216.65;
+        PP = 0.22336 * exp(-K * (H - 11) / 216.65);
+    } else if (H < 32) {
+        T = 216.65 + (H - 20);
+        PP = 0.054032 * pow(216.65 / T, K);
+    } else if (H < 47) {
+        T = 228.65 + 2.8 * (H - 32);
+        PP = 0.0085666 * pow(228.65 / T, K / 2.8);
+    } else if (H < 51) {
+        T = 270.65;
+        PP = 0.0010945 * exp(-K * (H - 47) / 270.65);
+    } else if (H < 71) {
+        T = 270.65 - 2.8 * (H - 51);
+        PP = 0.00066063 * pow(270.65 / T, -K / 2.8);
     } else {
-        temp = 11.0 - H / 1000.0;
-        *ru = 0.03718 * 9.8 * exp(temp / 6.318);
-        *mach = VT / 295.188;
+        T = 214.65 - 2 * (H - 71);
+        PP = 3.9046e-05 * pow(214.65 / T, -K / 2);
     }
+
+    RR = PP / (T / 288.15);
+    TS = T / 288.15;
+    sonic = AL * sqrt(TS);
+
+    *ru = RL * RR;
+    *mach = VT / sonic;
 }
 
 // return drag coefficient
@@ -219,7 +249,6 @@ static double uav_interp1(double *A, double Dim1[], int Len1, double X1) {
     double DA, Y;
 
     r = uav_find(Dim1, X1, Len1);
-
     DA = (X1 - Dim1[r]) / (Dim1[r + 1] - Dim1[r]);
     Y = A[r] + (A[r + 1] - A[r]) * DA;
     return (Y);
@@ -232,33 +261,28 @@ static double uav_interp2(double *A, double Dim1[], int Len1, double X1, double 
     double *SUB1, DA, V, W, Y;
 
     r = uav_find(Dim1, X1, Len1);
-
     DA = (X1 - Dim1[r]) / (Dim1[r + 1] - Dim1[r]);
-
     SUB1 = A + Len2 * r;
     V = uav_interp1(SUB1, Dim2, Len2, X2);
     SUB1 = A + Len2 * (r + 1);
     W = uav_interp1(SUB1, Dim2, Len2, X2);
-
     Y = V + (W - V) * DA;
     return (Y);
 }
 //=============================================================================
 // uav_interp3
 //=============================================================================
-static double uav_interp3(double *A, double Dim1[], int Len1, double X1, double Dim2[], int Len2, double X2, double Dim3[], int Len3, double X3) {
+static double uav_interp3(double *A, double Dim1[], int Len1, double X1, double Dim2[], int Len2, double X2,
+                          double Dim3[], int Len3, double X3) {
     static int r;
     static double *SUB2, DA, V, W, Y;
 
     r = uav_find(Dim1, X1, Len1);
-
     DA = (X1 - Dim1[r]) / (Dim1[r + 1] - Dim1[r]);
-
     SUB2 = A + Len2 * Len3 * r;
     V = uav_interp2(SUB2, Dim2, Len2, X2, Dim3, Len3, X3);
     SUB2 = A + Len2 * Len3 * (r + 1);
     W = uav_interp2(SUB2, Dim2, Len2, X2, Dim3, Len3, X3);
-
     Y = V + (W - V) * DA;
     return (Y);
 }
@@ -270,7 +294,6 @@ static int uav_find(double A[], double X, int len) {
     if (A[0] < A[len - 1]) { /*[数组顺序排列]*/
         P_Start = 0;
         P_End = len;
-
         if (X < A[0])
             result = 0;
         else if (X < A[len - 1]) {
@@ -290,7 +313,6 @@ static int uav_find(double A[], double X, int len) {
     } else { /*[数组逆序排列]*/
         P_Start = len - 1;
         P_End = 0;
-
         if (X >= A[0])
             result = 0;
         else if (X > A[len - 1]) {
@@ -298,7 +320,6 @@ static int uav_find(double A[], double X, int len) {
                 P_Start = len / 2 + 1;
             else
                 P_End = len / 2;
-
             for (i = P_Start; i >= P_End; i--) {
                 if (X < A[i]) {
                     result = i;
