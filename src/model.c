@@ -32,6 +32,7 @@ void model6dof(double t, double x[], double u[], double dx[], int dim) {
     double ru, mach, qs;
     double U, V, W;
     double CD, CL0, CM0, D, L, Y;
+
     const double CL_ele = 0.00636;
     const double CY_beta = -0.00909;
     const double CR_beta = -0.00600, CR_ail = -0.003618, CR_rud = 0.000144, CR_P = -0.52568, CR_R = 0.01832;
@@ -57,7 +58,7 @@ void model6dof(double t, double x[], double u[], double dx[], int dim) {
     rud = u[2];  // aileron  deflection angle [deg]
     eng = u[3];  // engine input
 
-    if (Vt < 0.1) Vt = 0.1;
+    //if (Vt < 0.1) Vt = 0.1;
     uav_density(H, Vt, &ru, &mach);  // [air density] [mach number]
     qs = SA * (ru * Vt * Vt / 2);    // [Dynamic pressure](kg/m^2)
 
