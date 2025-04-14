@@ -1,0 +1,49 @@
+# 忽略编译生成的文件
+*.o
+*.obj
+*.so
+*.dll
+*.out
+*.a
+*.lib
+*.pdb
+
+# 忽略临时文件
+*.tmp
+*.log
+*.swp
+*.swo
+*.bak
+
+# 忽略 Visual Studio 生成的文件
+*.vcxproj
+*.vcxproj.user
+*.vcxproj.filters
+*.sln
+*.ipch
+*.opensdf
+*.tlog
+*.obj
+*.idb
+*.pdb
+*.pch
+*.rsp
+*.ilk
+*.log
+*.vs/
+
+# 忽略 Git 合并冲突文件
+*.orig
+
+# 忽略 CMake 生成的无用文件
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+CTestTestfile.cmake
+*.cmake
+*.ninja
+build.ninja
+rules.ninja
+.ninja_log
+.ninja_deps
