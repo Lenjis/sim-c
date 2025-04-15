@@ -79,9 +79,9 @@ void ctrl_task(void) {
     //     default:
     //         break;
     // }
-    // if (t > 20) flag_Stop = 0;
+    if (t > 40) flag_Stop = 0;
     phi_cmd = 0;
-    theta_cmd = 0.9997;
+    theta_cmd = 1.119040707309775;
     H_cmd = 500;
     // ctrl_long();
     // ctrl_late();
@@ -167,7 +167,7 @@ void CALLBACK Timerdefine(UINT uDelay, UINT uMsg, DWORD dwUser, DWORD dw1, DWORD
     simu_run(); /*无人机模型解算 周期5ms*/
 
     if (cnt % 2 == 1) {
-        // ctrl_task(); /*简单的飞行控制*/
+        ctrl_task(); /*简单的飞行控制*/
     }
 }
 
