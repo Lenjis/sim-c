@@ -14,17 +14,33 @@ double T, x[13], u[3], t = 0;
 int sim_step, sim_status;
 short flag_Stop = 1;
 short ctrl_state = 0;
-double theta_cmd, theta_var, phi_cmd, phi_var, H_cmd, H_out, H_i = 0;
+double theta_cmd, theta_var, phi_cmd, phi_var;
+double H_cmd, H_out, H_i = 0, H_e, H_et, H_d;
 
-/*飞行器纵向控制*/
-void ctrl_long(void) {
+void ctrl_alt(void) {
     static double Ke_theta = 1, Ke_Q = 0.3, Ke_phi = 0.05;
     static double Kp_H = 3, Ki_H = 1, Kd_H = 1.5;
 
-    H_i += (H_cmd - ac_H) * 0.01;                // 积分项, dt=0.01s
-    H_out = Kp_H * (H_cmd - ac_H) + Ki_H * H_i;  // 高度控制
+    H_e = H_cmd - ac_H;  // 高度误差
+
+    if (H_e > 0.5)
+        H_i += 0.5 * T;
+    else if (H_e < -0.5)
+        H_i += -0.5 * T;
+    else
+        H_i += H_e * T;  // 积分项, dt=0.01s
+
+    H_d = (H_e - H_et) / T;  // 微分项
+
+    H_out = Kp_H * (H_e) + Ki_H * H_i + Kd_H * H_d;  // 高度控制
     ac_ele = Ke_Q * ac_Q * Rad2Deg - Ke_theta * (theta_cmd - ac_theta * Rad2Deg) - H_out;
-    // ac_ele = Ke_theta * (ac_theta * Rad2Deg - theta_cmd) + Ke_Q * ac_Q * Rad2Deg;
+}
+
+/*飞行器纵向控制*/
+void ctrl_long(void) {
+    static double Ke_theta = 0.45, Ke_Q = 0.25, Ke_phi = 0.05;
+
+    ac_ele = Ke_theta * (ac_theta * Rad2Deg - theta_cmd) + Ke_Q * ac_Q * Rad2Deg;
 }
 
 /*飞行器横侧向控制*/
@@ -63,18 +79,19 @@ void ctrl_task(void) {
     //     default:
     //         break;
     // }
-    if (t > 20) flag_Stop = 0;
+    // if (t > 20) flag_Stop = 0;
     phi_cmd = 0;
-    theta_cmd = 2.3397;
+    theta_cmd = 0.9997;
     H_cmd = 500;
-    ctrl_long();
-    ctrl_late();
+    // ctrl_long();
+    // ctrl_late();
+    // ctrl_alt();
 }
 
 /*飞行器模型解算模块，无需看懂*/
 void simu_run(void) {
-    static double g = 9.8;
-    static double stheta, ctheta, sphi, cphi, spsi, cpsi;
+    // static double g = 9.81;
+    // static double stheta, ctheta, sphi, cphi, spsi, cpsi;
 
     u[0] = ac_ele;
     u[1] = ac_ail;
@@ -117,11 +134,11 @@ void simu_run(void) {
 
 /*飞行器模型解算初始化，无需看懂*/
 void simu_init(void) {
-    ac_Vt = 25;
-    ac_alpha = 2.7480 / Rad2Deg;
+    ac_Vt = 30.0;
+    ac_alpha = 1.119040707310974 / Rad2Deg;
     ac_beta = 0 / Rad2Deg;
     ac_phi = 0.0 / Rad2Deg;
-    ac_theta = 2.7480 / Rad2Deg;
+    ac_theta = 1.119040707309775 / Rad2Deg;
     ac_psi = 0.0 / Rad2Deg;
     ac_P = 0 / Rad2Deg;
     ac_Q = 0 / Rad2Deg;
@@ -136,10 +153,10 @@ void simu_init(void) {
     t = 0;
     aircraft = model6dof;
 
-    ac_ele = -0.2739;
+    ac_ele = 0.868149045790946;
     ac_ail = 0.0;
     ac_rud = 0.0;
-    ac_eng = 36.1694;
+    ac_eng = 44.7534;
 }
 
 void CALLBACK Timerdefine(UINT uDelay, UINT uMsg, DWORD dwUser, DWORD dw1, DWORD dw2) {
@@ -150,7 +167,7 @@ void CALLBACK Timerdefine(UINT uDelay, UINT uMsg, DWORD dwUser, DWORD dw1, DWORD
     simu_run(); /*无人机模型解算 周期5ms*/
 
     if (cnt % 2 == 1) {
-        ctrl_task(); /*简单的飞行控制*/
+        // ctrl_task(); /*简单的飞行控制*/
     }
 }
 
@@ -172,7 +189,7 @@ void main(void) {
         count %= 10;
         if (count == 1) {
             printf(
-                "t: %8.4lf |Vt: %8.4lf |phi: %8.4lf "
+                "t: %6.2lf |Vt: %8.4lf |phi: %8.4lf "
                 "|theta: %8.4lf "
                 "|psi: %8.4lf |PN: %8.4lf |H: %8.4lf\n",
                 t, ac_Vt, ac_phi * Rad2Deg, ac_theta * Rad2Deg, ac_psi * Rad2Deg, ac_PN, ac_H);

@@ -16,7 +16,7 @@ typedef struct {
 
 SensorStruc ADIS16455;
 
-#define Rad2Deg 57.2957795130823208767981548141052
+#define Rad2Deg 57.295779513082323
 //
 //---[7]---飞机模型仿真参数定义
 //

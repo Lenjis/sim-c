@@ -27,11 +27,11 @@ void model6dof(double t, double x[], double u[], double dx[], int dim) {
     double Vt, alpha, beta, phi, theta, psi, P, Q, R, PN, PE, H;
     double alpha_deg, beta_deg;
     double dVt, dalpha, dbeta, dphi, dtheta, dpsi, dP, dQ, dR, dPN, dPE, dH;
-    double dU, dV, dW;
-    double ele, ail, rud, eng, Pow;
     double salpha, sbeta, sphi, stheta, spsi, calpha, cbeta, cphi, ctheta, cpsi;
-    double ru, mach, qs;
+    double ele, ail, rud, eng, Pow;
     double U, V, W;
+    double dU, dV, dW;
+    double ru, mach, qs;
     double CD, CL0, CM0, D, L, Y;
     double Lbar, M, N;
 
@@ -83,7 +83,7 @@ void model6dof(double t, double x[], double u[], double dx[], int dim) {
     W = Vt * salpha * cbeta;
     double uvw[3] = {U, V, W};  // [u,v,w]  ----- body axis velocity
 
-    Pow = eng / 100 * (mass * g * 4.0);
+    Pow = eng / 100 * (mass * g / 4.0);
 
     double J[3][3] = {{Ixx, 0, -Ixz}, {0, Iyy, 0}, {-Ixz, 0, Izz}};  // [inertia matrix]
     double J_inv[3][3] = {{-Izz / (Ixz * Ixz - Ixx * Izz), 0, -Ixz / (Ixz * Ixz - Ixx * Izz)},
@@ -224,24 +224,24 @@ static void uav_density(double H, double VT, double *ru, double *mach) {
 // return drag coefficient
 //=============================================================================
 static double uav_CD(double alpha_deg) {
-    static double IDX_alpha[14] = {-4.0, -2.0, 0.0, 2.0, 4.0, 8.0, 12.0, 16.0, 20.0};
-    static double TBL_CD[14] = {0.026, 0.024, 0.024, 0.028, 0.036, 0.061, 0.102, 0.141, 0.173};
+    static double IDX_alpha[9] = {-4.0, -2.0, 0.0, 2.0, 4.0, 8.0, 12.0, 16.0, 20.0};
+    static double TBL_CD[9] = {0.026, 0.024, 0.024, 0.028, 0.036, 0.061, 0.102, 0.141, 0.173};
     return uav_interp1(TBL_CD, IDX_alpha, 9, alpha_deg);
 }
 
 // return lift coefficient
 //=============================================================================
 static double uav_CL0(double alpha_deg) {
-    static double IDX_alpha[14] = {-4.0, -2.0, 0.0, 2.0, 4.0, 8.0, 12.0, 16.0, 20.0};
-    static double TBL_CL0[14] = {-0.219, -0.04, 0.139, 0.299, 0.455, 0.766, 1.083, 1.409, 1.743};
+    static double IDX_alpha[9] = {-4.0, -2.0, 0.0, 2.0, 4.0, 8.0, 12.0, 16.0, 20.0};
+    static double TBL_CL0[9] = {-0.219, -0.04, 0.139, 0.299, 0.455, 0.766, 1.083, 1.409, 1.743};
     return uav_interp1(TBL_CL0, IDX_alpha, 9, alpha_deg);
 }
 
 static double uav_CY() { return -0.00909; }
 
 static double uav_CM(double alpha_deg) {
-    static double IDX_alpha[14] = {-4.0, -2.0, 0.0, 2.0, 4.0, 8.0, 12.0, 16.0, 20.0};
-    static double TBL_CM0[14] = {0.1161, 0.0777, 0.0393, 0.0009, -0.0375, -0.0759, -0.1527, -0.2295, -0.3063};
+    static double IDX_alpha[9] = {-4.0, -2.0, 0.0, 2.0, 4.0, 8.0, 12.0, 16.0, 20.0};
+    static double TBL_CM0[9] = {0.1161, 0.0777, 0.0393, 0.0009, -0.0375, -0.0759, -0.1527, -0.2295, -0.3063};
     return uav_interp1(TBL_CM0, IDX_alpha, 9, alpha_deg);
 }
 
@@ -249,12 +249,7 @@ static double uav_interp1(double *A, double idx[], int Len1, double xi) {
     int r;
     double DA, Y;
 
-    if (xi < idx[0])
-        r = 0;
-    else if (xi < idx[Len1 - 1])
-        r = uav_find(idx, xi, Len1);
-    else
-        r = Len1 - 2;
+    r = uav_find(idx, xi, Len1);
 
     DA = (xi - idx[r]) / (idx[r + 1] - idx[r]);
     Y = A[r] + (A[r + 1] - A[r]) * DA;
@@ -268,9 +263,9 @@ static int uav_find(double A[], double X, int len) {
     if (A[0] < A[len - 1]) { /*[数组顺序排列]*/
         P_Start = 0;
         P_End = len;
-        if (X < A[0])
+        if (X < A[0]) {
             result = 0;
-        else if (X < A[len - 1]) {
+        } else if (X < A[len - 1]) {
             if (X > A[len / 2])
                 P_Start = len / 2;
             else
@@ -282,8 +277,9 @@ static int uav_find(double A[], double X, int len) {
                     break;
                 }
             }
-        } else
+        } else {
             result = len - 2;
+        }
     } else { /*[数组逆序排列]*/
         P_Start = len - 1;
         P_End = 0;
@@ -303,5 +299,5 @@ static int uav_find(double A[], double X, int len) {
         } else
             result = len - 2;
     }
-    return (result);
+    return result;
 }
