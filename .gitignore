@@ -37,6 +37,7 @@
 
 # 忽略 CMake 生成的无用文件
 build/
+.vscode/
 CMakeCache.txt
 cmake_install.cmake
 Makefile
