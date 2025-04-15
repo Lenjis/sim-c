@@ -17,33 +17,22 @@ typedef struct {
 SensorStruc ADIS16455;
 
 #define Rad2Deg 57.295779513082323
-//
-//---[7]---飞机模型仿真参数定义
-//
-double ac_Vt,  //[m/s]
-    ac_alpha,  //[rad]
-    ac_beta,   //[rad]
-    ac_P,      //[rad/s]
-    ac_R,      //[rad/s]
-    ac_Q,      //[rad/s]
-    ac_phi,    //[rad]
-    ac_theta,  //[rad]
-    ac_psi,
-    ac_heading,  //[rad]
-    ac_track,
-    ac_H,  //[m]
-    ac_PN, ac_PE,
+
+// 飞机模型仿真参数定义
+double ac_Vt,                  //[m/s]
+    ac_alpha, ac_beta,         //[rad]
+    ac_P, ac_Q, ac_R,          //[rad/s]
+    ac_phi, ac_theta, ac_psi,  //[rad]
+    ac_heading, ac_track,      //[rad]
+    ac_PN, ac_PE, ac_H,        //[m]
     ac_lon,  //[rad]
     ac_lat;  //[rad]
 
 double ac_ele,  //[deg]
     ac_ail,     //[deg]
     ac_rud,     //[deg]
-    ac_eng;     //[mm]
-//
-//---[12]---rk4.c declaration-------------------------------------------------//
-//
-void rk4(void (*fun)(), double t, double x[], double u[], int dim, double T,
-         double x2[], double *t2);
+    ac_eng;     //[0-100%]
+
+void rk4(void (*fun)(), double t, double x[], double u[], int dim, double T, double x2[], double *t2);
 
 #endif

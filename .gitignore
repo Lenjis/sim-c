@@ -16,6 +16,7 @@
 *.bak
 
 # 忽略 Visual Studio 生成的文件
+.vscode/
 *.vcxproj
 *.vcxproj.user
 *.vcxproj.filters
@@ -37,7 +38,6 @@
 
 # 忽略 CMake 生成的无用文件
 build/
-.vscode/
 CMakeCache.txt
 cmake_install.cmake
 Makefile

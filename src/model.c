@@ -23,6 +23,8 @@ static double uav_interp3(double *A, double idx[], int Len1, double xi, double D
                           double Dim3[], int Len3, double X3);
 static int uav_find(double A[], double X, int len);
 
+double ac_dH;
+
 void model6dof(double t, double x[], double u[], double dx[], int dim) {
     double Vt, alpha, beta, phi, theta, psi, P, Q, R, PN, PE, H;
     double alpha_deg, beta_deg;
@@ -162,6 +164,7 @@ void model6dof(double t, double x[], double u[], double dx[], int dim) {
     dPN = dVe[0];
     dPE = dVe[1];
     dH = -dVe[2];  // [dVe] = [dPN,dPE,dH]
+    ac_dH = dH;
 
     dx[0] = dVt;
     dx[1] = dalpha;
