@@ -16,30 +16,43 @@ short ctrl_state = 0;
 double theta_cmd, theta_var, phi_cmd, phi_var, H_cmd, H_out = 0;
 
 void ctrl_alt(void) {
-    static double Kp_H = 1.5, Ki_H = 0.5, Kd_H = 0.6;
-    static double H_i = 0, H_e = 0;
+    static const double Kp_H = 0.8, Ki_H = 0.5, Kd_H = 0.006;
+    static double H_i = 0, H_e = 0, H_prev = 0, H_d;
 
     H_e = H_cmd - ac_H;  // 高度误差
 
+    H_d = (ac_H - H_prev) / 0.01;  // 高度导数
+    H_prev = ac_H;
+
     if (H_e > 10)
-        H_i += 10 * T;
+        H_i += 10 * 0.01;
     else if (H_e < -10)
-        H_i += -10 * T;
+        H_i += -10 * 0.01;
     else
-        H_i += H_e * T;  // 积分项, dt=0.01s
+        H_i += H_e * 0.01;  // 积分项, dt=0.01s
 
     if (H_i > 10)
         H_i = 10;
     else if (H_i < -10)
         H_i = -10;
 
-    H_out = Kp_H * H_e + Ki_H * H_i + Kd_H * ac_dH;  // 高度控制
+    // H_out = Kp_H * H_e + Ki_H * H_i + Kd_H * H_d;  // 高度控制
 }
 
 void ctrl_long(void) {
-    static double K_theta = 1, K_Q = 0.3;
+    static double Kd_theta = 0.3, Ki_theta = 0, K_Q = 0.3;
+    static double theta_i = 0, theta_e = 0;
 
-    ac_ele = K_Q * ac_Q * Rad2Deg - K_theta * (theta_cmd - ac_theta * Rad2Deg + H_out);
+    theta_e = theta_cmd - ac_theta * Rad2Deg;  //[deg]
+
+    if (theta_e > 10)
+        theta_i += 10 * 0.01;
+    else if (theta_e < -10)
+        theta_i += -10 * 0.01;
+    else
+        theta_i += theta_e * 0.01;  // 积分项, dt=0.01s
+
+    ac_ele = K_Q * ac_Q * Rad2Deg - Kd_theta * (theta_e + H_out) - Ki_theta * theta_i;  // K_Q极性相反
 }
 
 // /*飞行器纵向控制*/
@@ -87,7 +100,7 @@ void ctrl_task(void) {
     // }
     if (t > 20) flag_Stop = 0;
     phi_cmd = 0;
-    theta_cmd = 1.1190407073;
+    theta_cmd = 1.1190407073 + 1;
     H_cmd = 501;
     ctrl_alt();
     ctrl_long();
