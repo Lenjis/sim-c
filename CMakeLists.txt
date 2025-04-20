@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.10)
 
 # 设置项目名称
 project(flight_sim VERSION 0.1 LANGUAGES C)
+
 # 设置MSVC编译编码
 #add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/source-charset:utf-8>")
 

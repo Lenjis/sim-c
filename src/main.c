@@ -8,6 +8,17 @@
 #include <stdio.h>
 #pragma comment(lib, "winmm.lib")
 
+#define KP_H 0.8
+#define KI_H 0.5
+#define KD_H 0.006
+
+#define KP_THETA 0.4
+#define KI_THETA 0.2
+#define KD_THETA 0.08
+
+#define KA_PHI 0.5
+#define KA_P 0.1
+
 void (*aircraft)();
 double T, x[13], u[3], t = 0;
 int sim_step, sim_status;
@@ -16,7 +27,7 @@ short ctrl_state = 0;
 double theta_cmd, theta_var, phi_cmd, phi_var, H_cmd, H_out = 0;
 
 void ctrl_alt(void) {
-    static const double Kp_H = 0.8, Ki_H = 0.5, Kd_H = 0.006;
+    const double Kp_H = KP_H, Ki_H = KI_H, Kd_H = KD_H;
     static double H_i = 0, H_e = 0, H_prev = 0, H_d;
 
     H_e = H_cmd - ac_H;  // 高度误差
@@ -39,20 +50,45 @@ void ctrl_alt(void) {
     // H_out = Kp_H * H_e + Ki_H * H_i + Kd_H * H_d;  // 高度控制
 }
 
-void ctrl_long(void) {
-    static double Kd_theta = 0.3, Ki_theta = 0, K_Q = 0.3;
-    static double theta_i = 0, theta_e = 0;
+// void ctrl_long(void) {
+//     static double Kp_theta = 1, Ki_theta = 0.1, K_Q = 0.3;
+//     static double theta_i = 0, theta_e = 0;
 
-    theta_e = theta_cmd - ac_theta * Rad2Deg;  //[deg]
+//     theta_e = theta_cmd - ac_theta * Rad2Deg;  //[deg]
 
-    if (theta_e > 10)
-        theta_i += 10 * 0.01;
-    else if (theta_e < -10)
-        theta_i += -10 * 0.01;
-    else
-        theta_i += theta_e * 0.01;  // 积分项, dt=0.01s
+//     if (theta_e > 10)
+//         theta_i += 10 * 0.01;
+//     else if (theta_e < -10)
+//         theta_i += -10 * 0.01;
+//     else
+//         theta_i += theta_e * 0.01;  // 积分项, dt=0.01s
 
-    ac_ele = K_Q * ac_Q * Rad2Deg - Kd_theta * (theta_e + H_out) - Ki_theta * theta_i;  // K_Q极性相反
+//     if (theta_i > 10)
+//         theta_i = 10;
+//     else if (theta_i < -10)
+//         theta_i = -10;
+
+//     ac_ele = K_Q * ac_Q * Rad2Deg - Kp_theta * (theta_e + H_out) - Ki_theta * theta_i;  // K_Q极性相反
+// }
+
+void ctrl_long(void) {  // incremental PID
+    const double Kp_theta = KP_THETA, Ki_theta = KI_THETA, Kd_theta = KD_THETA, dt = 0.01;
+    static double theta_e = 0, theta_e1 = 0, theta_e2 = 0;  // 当前、上一次、上上次误差
+    static double du = 0;
+    static double ac_ele_last = 0;
+
+    theta_e = theta_cmd - ac_theta * Rad2Deg;
+
+    du =
+        Kp_theta * (theta_e - theta_e1) + Ki_theta * theta_e * dt + Kd_theta * (theta_e - 2 * theta_e1 + theta_e2) / dt;
+
+    ac_ele -= du;  // 舵量输入相反
+
+    theta_e2 = theta_e1;
+    theta_e1 = theta_e;
+
+    // 加上角速率反馈项
+    // ac_ele -= 0.3 * ac_Q * Rad2Deg;
 }
 
 // /*飞行器纵向控制*/
@@ -64,7 +100,7 @@ void ctrl_long(void) {
 
 /*飞行器横侧向控制*/
 void ctrl_late(void) {
-    static double Ka_phi = 0.5, Ka_P = 0.1;
+    static double Ka_phi = KA_PHI, Ka_P = KA_P;
 
     ac_ail = Ka_phi * (ac_phi * Rad2Deg - phi_cmd) + Ka_P * ac_P * Rad2Deg;
 }
@@ -178,7 +214,7 @@ void simu_init(void) {
     ac_eng = 44.753409573328163;
 }
 
-void CALLBACK Timerdefine(UINT uDelay, UINT uMsg, DWORD dwUser, DWORD dw1, DWORD dw2) {
+void CALLBACK Timerdefine(UINT uTimerID, UINT uMsg, DWORD_PTR dwUser, DWORD_PTR dw1, DWORD_PTR dw2) {
     static short cnt = 0;
     cnt++;
     cnt %= 100;
