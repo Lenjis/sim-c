@@ -8,13 +8,13 @@
 #include <stdio.h>
 #pragma comment(lib, "winmm.lib")
 
-#define KP_H 0.8
-#define KI_H 0.5
-#define KD_H 0.006
+#define KP_H 1.2
+#define KI_H 0.1
+#define KD_H 0
 
-#define KP_THETA 0.4
-#define KI_THETA 0.2
-#define KD_THETA 0.08
+#define KP_THETA 0.7
+#define KI_THETA 0.3
+#define KD_THETA 0.1
 
 #define KA_PHI 0.5
 #define KA_P 0.1
@@ -27,27 +27,27 @@ short ctrl_state = 0;
 double theta_cmd, theta_var, phi_cmd, phi_var, H_cmd, H_out = 0;
 
 void ctrl_alt(void) {
-    const double Kp_H = KP_H, Ki_H = KI_H, Kd_H = KD_H;
+    const double Kp_H = KP_H, Ki_H = KI_H, Kd_H = KD_H, dt = 0.01;
     static double H_i = 0, H_e = 0, H_prev = 0, H_d;
 
     H_e = H_cmd - ac_H;  // 高度误差
 
-    H_d = (ac_H - H_prev) / 0.01;  // 高度导数
+    H_d = (ac_H - H_prev) / dt;  // 高度导数
     H_prev = ac_H;
 
-    if (H_e > 10)
-        H_i += 10 * 0.01;
-    else if (H_e < -10)
-        H_i += -10 * 0.01;
+    if (H_e > 20)
+        H_i += 20 * dt;
+    else if (H_e < -20)
+        H_i += -20 * dt;
     else
-        H_i += H_e * 0.01;  // 积分项, dt=0.01s
+        H_i += H_e * dt;  // 积分项, dt=0.01s
 
-    if (H_i > 10)
-        H_i = 10;
-    else if (H_i < -10)
-        H_i = -10;
+    // if (H_i > 20)
+    //     H_i = 20;
+    // else if (H_i < -20)
+    //     H_i = -20;
 
-    // H_out = Kp_H * H_e + Ki_H * H_i + Kd_H * H_d;  // 高度控制
+    H_out = Kp_H * H_e + Ki_H * H_i + Kd_H * H_d;  // 高度控制
 }
 
 // void ctrl_long(void) {
@@ -77,7 +77,7 @@ void ctrl_long(void) {  // incremental PID
     static double du = 0;
     static double ac_ele_last = 0;
 
-    theta_e = theta_cmd - ac_theta * Rad2Deg;
+    theta_e = theta_cmd + H_out - ac_theta * Rad2Deg;
 
     du =
         Kp_theta * (theta_e - theta_e1) + Ki_theta * theta_e * dt + Kd_theta * (theta_e - 2 * theta_e1 + theta_e2) / dt;
@@ -106,41 +106,57 @@ void ctrl_late(void) {
 }
 
 /*飞行器控制模块*/
-void ctrl_task(void) {
-    // switch (ctrl_state) {
-    //     case 0:
-    //         theta_cmd = 2;
-    //         phi_cmd = 0;
-    //         if (t >= 10) ctrl_state++;
-    //         break;
-    //     case 1:
-    //         theta_cmd = 2;  // t*3.14/5- 周期T=10s
-    //         phi_cmd = 30;
-    //         if (t >= 20) ctrl_state++;
-    //         break;
-    //     case 2:
-    //         theta_cmd = 2;  // t*3.14/5- 周期T=10s
-    //         phi_cmd = 0;
-    //         if (t >= 30) ctrl_state++;
-    //         break;
-    //     case 3:
-    //         theta_cmd = 2;  // t*3.14/5- 周期T=10s
-    //         phi_cmd = -30;
-    //         if (t >= 40) ctrl_state++;
-    //         break;
-    //     case 4:
-    //         flag_Stop = 0;
-    //         break;
-    //     default:
-    //         break;
-    // }
-    if (t > 20) flag_Stop = 0;
+void ctrl_level(void) {
+    if (t > 40) flag_Stop = 0;
     phi_cmd = 0;
-    theta_cmd = 1.1190407073 + 1;
-    H_cmd = 501;
+    theta_cmd = 1.1190407073;
+    H_cmd = 500;
     ctrl_alt();
     ctrl_long();
     // ctrl_late();
+}
+
+void ctrl_rectangular(void) {
+    // during:dpsi=psi_cmd-psi_deg;
+    // while(dpsi>180) dpsi=dpsi-360;end
+    // while(dpsi<-180) dpsi=dpsi+360;end
+    // phi_cmd=1.0*dpsi;
+    // if(phi_cmd>45) phi_cmd=45;end
+    // if(phi_cmd<-45) phi_cmd=-45;end
+    static double dpsi = 0, psi_cmd;
+
+    switch (ctrl_state) {
+        case 0:
+            psi_cmd = 0;
+            if (ac_PN >= 500) ctrl_state++;
+            break;
+        case 1:
+            psi_cmd = 90;
+            if (ac_PE >= 500) ctrl_state++;
+            break;
+        case 2:
+            psi_cmd = 180;
+            if (ac_PN <= 0) ctrl_state++;
+            break;
+        case 3:
+            psi_cmd = 270;
+            if (ac_PE <= 0) ctrl_state = 0;
+            break;
+        default:
+            break;
+    }
+    if (t > 200) flag_Stop = 0;
+    dpsi = psi_cmd - ac_psi * Rad2Deg;
+    while (dpsi > 180) dpsi = dpsi - 360;
+    while (dpsi < -180) dpsi = dpsi + 360;
+    phi_cmd = 1.0 * dpsi;
+    if (phi_cmd > 45) phi_cmd = 45;
+    if (phi_cmd < -45) phi_cmd = -45;
+    theta_cmd = 1.1190407073;
+    H_cmd = 500;
+    ctrl_alt();
+    ctrl_long();
+    ctrl_late();
 }
 
 /*飞行器模型解算模块，无需看懂*/
@@ -222,7 +238,7 @@ void CALLBACK Timerdefine(UINT uTimerID, UINT uMsg, DWORD_PTR dwUser, DWORD_PTR 
     simu_run(); /*无人机模型解算 周期5ms*/
 
     if (cnt % 2 == 1) {
-        ctrl_task(); /*简单的飞行控制*/
+        ctrl_rectangular(); /*简单的飞行控制*/
     }
 }
 
@@ -236,7 +252,7 @@ void main(void) {
     idtimer = timeSetEvent(5, 5, Timerdefine, 0, TIME_PERIODIC);  // 5ms中断一次
 
     fp = fopen("simu.txt", "w");  // openfile
-    fprintf(fp, "t\tVt\tphi\ttheta\tpsi\tPN\tH\n");
+    fprintf(fp, "t\tVt\tphi\ttheta\tpsi\tPN\tPE\tH\tele\tail\trud\teng\n");
 
     printf("Running simulation! \n");
     while (flag_Stop) {
@@ -244,14 +260,12 @@ void main(void) {
         count++;
         count %= 200;
         if (count == 0) {
-            printf(
-                "t: %6.2lf |Vt: %8.4lf |phi: %8.4lf "
-                "|theta: %8.4lf "
-                "|psi: %8.4lf |PN: %8.4lf |H: %8.4lf\n",
-                t, ac_Vt, ac_phi * Rad2Deg, ac_theta * Rad2Deg, ac_psi * Rad2Deg, ac_PN, ac_H);
+            printf("t: %6.2lf Vt: %6.2lf phi: %6.2lf theta: %6.2lf psi: %6.2lf PN: %8.2lf PE: %8.2lf H: %6.2lf", t,
+                   ac_Vt, ac_phi * Rad2Deg, ac_theta * Rad2Deg, ac_psi * Rad2Deg, ac_PN, ac_PE, ac_H);
+            printf("   ele: %6.2lf ail: %6.2lf rud: %6.2lf eng: %6.2lf\n", ac_ele, ac_ail, ac_rud, ac_eng);
         }
-        fprintf(fp, "%lf\t%lf\t%lf\t%lf\t%lf\t%lf\t%lf\n", t, ac_Vt, ac_phi * Rad2Deg, ac_theta * Rad2Deg,
-                ac_psi * Rad2Deg, ac_PN, ac_H);
+        fprintf(fp, "%lf\t%lf\t%lf\t%lf\t%lf\t%lf\t%lf\t%lf\t%lf\t%lf\t%lf\t%lf\n", t, ac_Vt, ac_phi * Rad2Deg,
+                ac_theta * Rad2Deg, ac_psi * Rad2Deg, ac_PN, ac_PE, ac_H, ac_ele, ac_ail, ac_rud, ac_eng);
     };
     fclose(fp);
 }
