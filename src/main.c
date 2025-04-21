@@ -159,6 +159,8 @@ void ctrl_rectangular(void) {
     ctrl_late();
 }
 
+void ctrl_approach(void) {}
+
 /*飞行器模型解算模块，无需看懂*/
 void simu_run(void) {
     // static double g = 9.81;
@@ -262,7 +264,7 @@ void main(void) {
         if (count == 0) {
             printf("t: %6.2lf Vt: %6.2lf phi: %6.2lf theta: %6.2lf psi: %6.2lf PN: %8.2lf PE: %8.2lf H: %6.2lf", t,
                    ac_Vt, ac_phi * Rad2Deg, ac_theta * Rad2Deg, ac_psi * Rad2Deg, ac_PN, ac_PE, ac_H);
-            printf("   ele: %6.2lf ail: %6.2lf rud: %6.2lf eng: %6.2lf\n", ac_ele, ac_ail, ac_rud, ac_eng);
+            printf(" | ele: %6.2lf ail: %6.2lf rud: %6.2lf eng: %6.2lf\n", ac_ele, ac_ail, ac_rud, ac_eng);
         }
         fprintf(fp, "%lf\t%lf\t%lf\t%lf\t%lf\t%lf\t%lf\t%lf\t%lf\t%lf\t%lf\t%lf\n", t, ac_Vt, ac_phi * Rad2Deg,
                 ac_theta * Rad2Deg, ac_psi * Rad2Deg, ac_PN, ac_PE, ac_H, ac_ele, ac_ail, ac_rud, ac_eng);
