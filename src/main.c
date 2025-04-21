@@ -16,7 +16,7 @@
 #define KI_THETA 0.3
 #define KD_THETA 0.1
 
-#define KA_PHI 0.5
+#define KA_PHI 0.7
 #define KA_P 0.1
 
 void (*aircraft)();
