@@ -51,6 +51,7 @@ void ctrl_alt(void) {
     H_out = Kp_H * H_e + Ki_H * H_i + Kd_H * H_d;  // 高度控制
 }
 
+/*飞行器纵向控制*/
 void ctrl_long(void) {  // incremental PID
     const double Kp_theta = KP_THETA, Ki_theta = KI_THETA, Kd_theta = KD_THETA, dt = 0.01;
     static double theta_e = 0, theta_e1 = 0, theta_e2 = 0;  // 当前、上一次、上上次误差
@@ -85,8 +86,8 @@ void ctrl_late(void) {
     phi_e1 = phi_e;
 }
 
-/*飞行器控制模块*/
-void ctrl_level(void) {  // 平飞巡航
+/*水平巡航*/
+void ctrl_level(void) {
     if (t > 20) flag_Stop = 0;
     phi_cmd = 1;
     theta_cmd = 1.1190407073;
@@ -96,7 +97,8 @@ void ctrl_level(void) {  // 平飞巡航
     ctrl_late();
 }
 
-void ctrl_rectangular(void) {  // 矩形轨迹巡航
+/*矩形轨迹巡航*/
+void ctrl_rectangular(void) {
     static double dpsi = 0, psi_cmd;
 
     switch (ctrl_state) {
@@ -133,6 +135,7 @@ void ctrl_rectangular(void) {  // 矩形轨迹巡航
     ctrl_late();
 }
 
+/*进场着陆*/
 void ctrl_approach(void) {}
 
 /*飞行器模型解算模块，无需看懂*/
