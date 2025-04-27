@@ -1,5 +1,5 @@
-# sim-c
-an embedded UAV 6-DOF control and simulation model.
+# uav-sim
+an embeded UAV 6-DOF control and simulation model
 
 ## Aircraft Parameters
 - **Wing Area:** 1.3536 m²
