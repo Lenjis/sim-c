@@ -1,5 +1,5 @@
 # uav-sim
-an embeded UAV 6-DOF control and simulation model
+an embeded UAV 6-DOF control and simulation model.
 
 ## Aircraft Parameters
 - **Wing Area:** 1.3536 m²
@@ -11,3 +11,6 @@ an embeded UAV 6-DOF control and simulation model
   - Ixx: 1.71 kg·m²
   - Iyy: 5.54 kg·m²
   - Izz: 4.15 kg·m²
+
+## Solving Algorithm:
+4-th order Runge-Kutta (RK4)
