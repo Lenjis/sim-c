@@ -8,6 +8,8 @@
 #include <stdio.h>
 #pragma comment(lib, "winmm.lib")
 
+#define DT 0.01
+
 #define KP_H 1.2
 #define KI_H 0.1
 #define KD_H 0
@@ -20,47 +22,49 @@
 #define KI_PHI 0.5
 #define KD_PHI 0.1
 
+#define KP_SPEED 1000
+#define KI_SPEED 1500
+#define KD_SPEED 0
+
 void (*aircraft)();
 double T, x[13], u[3], t = 0;
 int sim_step, sim_status;
 short flag_Stop = 1;
 short ctrl_state = 0;
-double theta_cmd, theta_var, phi_cmd, phi_var, H_cmd, H_out = 0;
+double theta_cmd = 0, phi_cmd = 0, H_cmd = 0, speed_cmd = 0, H_out = 0;
 
 void ctrl_alt(void) {
-    const double Kp_H = KP_H, Ki_H = KI_H, Kd_H = KD_H, dt = 0.01;
     static double H_i = 0, H_e = 0, H_prev = 0, H_d;
 
     H_e = H_cmd - ac_H;  // 高度误差
 
-    H_d = (ac_H - H_prev) / dt;  // 高度导数
+    H_d = (ac_H - H_prev) / DT;  // 高度导数
     H_prev = ac_H;
 
     if (H_e > 20)
-        H_i += 20 * dt;
+        H_i += 20 * DT;
     else if (H_e < -20)
-        H_i += -20 * dt;
+        H_i += -20 * DT;
     else
-        H_i += H_e * dt;  // 积分项, dt=0.01s
+        H_i += H_e * DT;  // 积分项, dt=0.01s
 
     // if (H_i > 20)
     //     H_i = 20;
     // else if (H_i < -20)
     //     H_i = -20;
 
-    H_out = Kp_H * H_e + Ki_H * H_i + Kd_H * H_d;  // 高度控制
+    H_out = KP_H * H_e + KI_H * H_i + KD_H * H_d;  // 高度控制
 }
 
 /*飞行器纵向控制*/
-void ctrl_long(void) {  // incremental PID
-    const double Kp_theta = KP_THETA, Ki_theta = KI_THETA, Kd_theta = KD_THETA, dt = 0.01;
+void ctrl_long(void) {                                      // incremental PID
     static double theta_e = 0, theta_e1 = 0, theta_e2 = 0;  // 当前、上一次、上上次误差
     static double du = 0;
 
     theta_e = theta_cmd + H_out - ac_theta * Rad2Deg;
 
     du =
-        Kp_theta * (theta_e - theta_e1) + Ki_theta * theta_e * dt + Kd_theta * (theta_e - 2 * theta_e1 + theta_e2) / dt;
+        KP_THETA * (theta_e - theta_e1) + KI_THETA * theta_e * DT + KD_THETA * (theta_e - 2 * theta_e1 + theta_e2) / DT;
 
     ac_ele -= du;  // 舵量输入相反
 
@@ -68,9 +72,26 @@ void ctrl_long(void) {  // incremental PID
     theta_e1 = theta_e;
 }
 
+void ctrl_speed() {
+    static double speed = 0, speed_e1 = 0, speed_e2 = 0;  // 当前、上一次、上上次误差
+    static double du = 0;
+
+    speed = speed_cmd - ac_Vt;
+
+    du = KP_SPEED * (speed - speed_e1) + KI_SPEED * speed * DT + KD_SPEED * (speed - 2 * speed_e1 + speed_e2) / DT;
+
+    ac_eng += du;  // 舵量输入相反
+
+    if (ac_eng > 100) ac_eng = 100;
+    if (ac_eng < 0) ac_eng = 0;
+
+    speed_e2 = speed_e1;
+    speed_e1 = speed;
+}
+
 /*飞行器横侧向控制*/
 void ctrl_late(void) {
-    const double Kp_phi = KP_PHI, Ki_phi = KI_PHI, Kd_phi = KD_PHI, dt = 0.01;
+    const double Kp_phi = KP_PHI, Ki_phi = KI_PHI, Kd_phi = KD_PHI;
     static double phi_e = 0, phi_e1 = 0, phi_e2 = 0;  // 当前、上一次、上上次误差
     static double du = 0;
 
@@ -78,7 +99,7 @@ void ctrl_late(void) {
 
     phi_e = phi_cmd - ac_phi * Rad2Deg;
 
-    du = Kp_phi * (phi_e - phi_e1) + Ki_phi * phi_e * dt + Kd_phi * (phi_e - 2 * phi_e1 + phi_e2) / dt;
+    du = Kp_phi * (phi_e - phi_e1) + Ki_phi * phi_e * DT + Kd_phi * (phi_e - 2 * phi_e1 + phi_e2) / DT;
 
     ac_ail -= du;  // 舵量输入相反
 
@@ -89,12 +110,13 @@ void ctrl_late(void) {
 /*水平巡航*/
 void ctrl_level(void) {
     if (t > 20) flag_Stop = 0;
-    phi_cmd = 1;
+    speed_cmd = 31;
     theta_cmd = 1.1190407073;
     H_cmd = 500;
     ctrl_alt();
     ctrl_long();
     ctrl_late();
+    ctrl_speed();
 }
 
 /*矩形轨迹巡航*/
