@@ -26,6 +26,9 @@
 #define KI_SPEED 1500
 #define KD_SPEED 0
 
+#define THETA_LEVEL 0.993401430622199  // [deg]
+#define ENG_LEVEL 46.262948302356023   // [%]
+
 void (*aircraft)();
 double T, x[13], u[3], t = 0;
 int sim_step, sim_status;
@@ -109,10 +112,10 @@ void ctrl_late(void) {
 
 /*水平巡航*/
 void ctrl_level(void) {
-    if (t > 20) flag_Stop = 0;
-    speed_cmd = 31;
-    theta_cmd = 1.1190407073;
-    H_cmd = 500;
+    if (t > 100) flag_Stop = 0;
+    speed_cmd = 30;
+    theta_cmd = THETA_LEVEL;
+    H_cmd = 50;
     ctrl_alt();
     ctrl_long();
     ctrl_late();
@@ -158,7 +161,74 @@ void ctrl_rectangular(void) {
 }
 
 /*进场着陆*/
-void ctrl_approach(void) {}
+void ctrl_approach(void) {
+    const double H2 = 2, H1 = 50, path2 = 0.8, path1 = 3.5;
+    static double L1, L2;
+    L2 = H2 / tan(path2 / Rad2Deg);  // 拉飘段开始距离
+    L1 = L2 + (H1 - H2) / tan(path1 / Rad2Deg); // 进场段开始距离
+    static double Vt_slope, Vt_0;
+
+    switch (ctrl_state) {
+        case 0:
+            // level
+            // entry:
+            // theta_g = 2.340;
+            // eng_c = 36.169;
+            // H2 = 2; H1 = 55;
+            // path2 = 1; path1 = 3.5;
+            // %L2 = H2 / tan(deg2rad(path2));
+            // L2 = 114.580;
+            // %L1 = L2 + (H1 - H2) / tan(deg2rad(path1));
+            // L1 = 981.122;
+            // during:
+            // H_g = H1;
+            // Vt_g = Vt;
+            theta_cmd = THETA_LEVEL;
+            H_cmd = H1;
+            speed_cmd = 30;
+            if (ac_PN > -L1) {
+                theta_cmd = -1;
+                ac_eng = 5;
+                Vt_slope = (ac_Vt - 18) / (H1 - H2);
+                Vt_0 = ac_Vt;
+                ctrl_state++;
+            }
+            break;
+        case 1:
+            // entry:
+            // theta_g = -1;
+            // eng_c = 5;
+            // Vt_slope = (Vt - 18) / (H1 - H2);
+            // Vt_0 = Vt;
+            // during:
+            // H_g = H2 + (-L - L2) * tan(deg2rad(path1));
+            // Vt_g = Vt_0 - Vt_slope * (H1 - H);
+            H_cmd = H2 + (-ac_PN - L2) * tan(path1 / Rad2Deg);
+            speed_cmd = Vt_0 - Vt_slope * (H1 - ac_H);
+            if (ac_PN > -L2) {
+                theta_cmd = 3;
+                ac_eng = 0;
+                ctrl_state++;
+            }
+            break;
+        case 2:
+            // entry:
+            // theta_g = 3; eng_c = 0;
+            // during:
+            // H_g = -L * tan(deg2rad(path2));
+            // %H_g = H;
+            // Vt_g = 17;
+            H_cmd = -ac_PN * tan(path2 / Rad2Deg);
+            speed_cmd = 17;
+            if (ac_H <= 0 || t > 40) flag_Stop = 0;
+            break;
+        default:
+            break;
+    }
+    ctrl_alt();
+    ctrl_long();
+    ctrl_speed();
+}
 
 /*飞行器模型解算模块，无需看懂*/
 void simu_run(void) {
@@ -207,17 +277,17 @@ void simu_run(void) {
 /*飞行器模型解算初始化，无需看懂*/
 void simu_init(void) {
     ac_Vt = 30.0;
-    ac_alpha = 1.1190407073 / Rad2Deg;
+    ac_alpha = THETA_LEVEL / Rad2Deg;
     ac_beta = 0 / Rad2Deg;
     ac_phi = 0.0 / Rad2Deg;
-    ac_theta = 1.1190407073 / Rad2Deg;
+    ac_theta = THETA_LEVEL / Rad2Deg;
     ac_psi = 0.0 / Rad2Deg;
     ac_P = 0 / Rad2Deg;
     ac_Q = 0 / Rad2Deg;
     ac_R = 0 / Rad2Deg;
-    ac_PN = 0.0 / Rad2Deg;
-    ac_PE = 0.0 / Rad2Deg;
-    ac_H = 500;
+    ac_PN = -1100;
+    ac_PE = 0.0;
+    ac_H = 50;
 
     sim_step = 5;  // 5ms
     sim_status = 0;
@@ -225,10 +295,10 @@ void simu_init(void) {
     t = 0;
     aircraft = model6dof;
 
-    ac_ele = 0.868149045790946;
+    ac_ele = 0.993401430622199;
     ac_ail = 0.0;
     ac_rud = 0.0;
-    ac_eng = 44.753409573328163;
+    ac_eng = 46.262948302356023;
 }
 
 void CALLBACK Timerdefine(UINT uTimerID, UINT uMsg, DWORD_PTR dwUser, DWORD_PTR dw1, DWORD_PTR dw2) {
@@ -239,7 +309,7 @@ void CALLBACK Timerdefine(UINT uTimerID, UINT uMsg, DWORD_PTR dwUser, DWORD_PTR 
     simu_run(); /*无人机模型解算 周期5ms*/
 
     if (cnt % 2 == 1) {
-        ctrl_level(); /*简单的飞行控制*/
+        ctrl_approach(); /*简单的飞行控制*/
     }
 }
 
@@ -253,7 +323,7 @@ void main(void) {
     idtimer = timeSetEvent(5, 5, Timerdefine, 0, TIME_PERIODIC);  // 5ms中断一次
 
     fp = fopen("simu.txt", "w");  // openfile
-    fprintf(fp, "t\tVt\tphi\ttheta\tpsi\tPN\tPE\tH\tele\tail\trud\teng\n");
+    fprintf(fp, "t\tVt\tphi\ttheta\tpsi\tPN\tPE\tH\tele\tail\trud\teng\tH_cmd\n");
 
     printf("Running simulation! \n");
     while (flag_Stop) {
@@ -264,8 +334,8 @@ void main(void) {
                    ac_Vt, ac_phi * Rad2Deg, ac_theta * Rad2Deg, ac_psi * Rad2Deg, ac_PN, ac_PE, ac_H);
             printf(" | ele: %6.2lf ail: %6.2lf rud: %6.2lf eng: %6.2lf\n", ac_ele, ac_ail, ac_rud, ac_eng);
         }
-        fprintf(fp, "%lf\t%lf\t%lf\t%lf\t%lf\t%lf\t%lf\t%lf\t%lf\t%lf\t%lf\t%lf\n", t, ac_Vt, ac_phi * Rad2Deg,
-                ac_theta * Rad2Deg, ac_psi * Rad2Deg, ac_PN, ac_PE, ac_H, ac_ele, ac_ail, ac_rud, ac_eng);
+        fprintf(fp, "%lf\t%lf\t%lf\t%lf\t%lf\t%lf\t%lf\t%lf\t%lf\t%lf\t%lf\t%lf\t%lf\n", t, ac_Vt, ac_phi * Rad2Deg,
+                ac_theta * Rad2Deg, ac_psi * Rad2Deg, ac_PN, ac_PE, ac_H, ac_ele, ac_ail, ac_rud, ac_eng, H_cmd);
     };
     fclose(fp);
 }
