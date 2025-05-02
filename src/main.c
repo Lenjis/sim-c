@@ -34,10 +34,10 @@ double T, x[13], u[3], t = 0;
 int sim_step, sim_status;
 short flag_Stop = 1;
 short ctrl_state = 0;
-double theta_cmd = 0, phi_cmd = 0, H_cmd = 0, speed_cmd = 0, H_out = 0;
+double theta_cmd = 0, phi_cmd = 0, H_cmd = 0, speed_cmd = 0, H_out = 0, H_d;
 
 void ctrl_alt(void) {
-    static double H_i = 0, H_e = 0, H_prev = 0, H_d;
+    static double H_i = 0, H_e = 0, H_prev = 0;
 
     H_e = H_cmd - ac_H;  // 高度误差
 
@@ -60,14 +60,15 @@ void ctrl_alt(void) {
 }
 
 /*飞行器纵向控制*/
-void ctrl_long(void) {                                      // incremental PID
-    static double theta_e = 0, theta_e1 = 0, theta_e2 = 0;  // 当前、上一次、上上次误差
+void ctrl_long(void) {  // incremental PID
+    static double theta_e = 0, theta_e1 = 0,
+                  theta_e2 = 0;  // 当前、上一次、上上次误差
     static double du = 0;
 
     theta_e = theta_cmd + H_out - ac_theta * Rad2Deg;
 
-    du =
-        KP_THETA * (theta_e - theta_e1) + KI_THETA * theta_e * DT + KD_THETA * (theta_e - 2 * theta_e1 + theta_e2) / DT;
+    du = KP_THETA * (theta_e - theta_e1) + KI_THETA * theta_e * DT +
+         KD_THETA * (theta_e - 2 * theta_e1 + theta_e2) / DT;
 
     ac_ele -= du;  // 舵量输入相反
 
@@ -76,12 +77,14 @@ void ctrl_long(void) {                                      // incremental PID
 }
 
 void ctrl_speed() {
-    static double speed = 0, speed_e1 = 0, speed_e2 = 0;  // 当前、上一次、上上次误差
+    static double speed = 0, speed_e1 = 0,
+                  speed_e2 = 0;  // 当前、上一次、上上次误差
     static double du = 0;
 
     speed = speed_cmd - ac_Vt;
 
-    du = KP_SPEED * (speed - speed_e1) + KI_SPEED * speed * DT + KD_SPEED * (speed - 2 * speed_e1 + speed_e2) / DT;
+    du = KP_SPEED * (speed - speed_e1) + KI_SPEED * speed * DT +
+         KD_SPEED * (speed - 2 * speed_e1 + speed_e2) / DT;
 
     ac_eng += du;  // 舵量输入相反
 
@@ -95,14 +98,17 @@ void ctrl_speed() {
 /*飞行器横侧向控制*/
 void ctrl_late(void) {
     const double Kp_phi = KP_PHI, Ki_phi = KI_PHI, Kd_phi = KD_PHI;
-    static double phi_e = 0, phi_e1 = 0, phi_e2 = 0;  // 当前、上一次、上上次误差
+    static double phi_e = 0, phi_e1 = 0,
+                  phi_e2 = 0;  // 当前、上一次、上上次误差
     static double du = 0;
 
-    // ac_ail = Kp_phi * (ac_phi * Rad2Deg - phi_cmd) + Kd_phi * ac_P * Rad2Deg;
+    // ac_ail = Kp_phi * (ac_phi * Rad2Deg - phi_cmd) + Kd_phi * ac_P *
+    // Rad2Deg;
 
     phi_e = phi_cmd - ac_phi * Rad2Deg;
 
-    du = Kp_phi * (phi_e - phi_e1) + Ki_phi * phi_e * DT + Kd_phi * (phi_e - 2 * phi_e1 + phi_e2) / DT;
+    du = Kp_phi * (phi_e - phi_e1) + Ki_phi * phi_e * DT +
+         Kd_phi * (phi_e - 2 * phi_e1 + phi_e2) / DT;
 
     ac_ail -= du;  // 舵量输入相反
 
@@ -112,14 +118,14 @@ void ctrl_late(void) {
 
 /*水平巡航*/
 void ctrl_level(void) {
-    if (t > 100) flag_Stop = 0;
+    if (t > 10) flag_Stop = 0;
     speed_cmd = 30;
-    theta_cmd = THETA_LEVEL;
+    theta_cmd = THETA_LEVEL;  // 0.993401430622199
     H_cmd = 50;
-    ctrl_alt();
-    ctrl_long();
-    ctrl_late();
-    ctrl_speed();
+    // ctrl_alt();
+    // ctrl_long();
+    // ctrl_late();
+    // ctrl_speed();
 }
 
 /*矩形轨迹巡航*/
@@ -153,8 +159,8 @@ void ctrl_rectangular(void) {
     phi_cmd = 1.0 * dpsi;
     if (phi_cmd > 45) phi_cmd = 45;
     if (phi_cmd < -45) phi_cmd = -45;
-    theta_cmd = 1.1190407073;
-    H_cmd = 500;
+    theta_cmd = THETA_LEVEL;
+    H_cmd = 50;
     ctrl_alt();
     ctrl_long();
     ctrl_late();
@@ -164,25 +170,12 @@ void ctrl_rectangular(void) {
 void ctrl_approach(void) {
     const double H2 = 2, H1 = 50, path2 = 0.8, path1 = 3.5;
     static double L1, L2;
-    L2 = H2 / tan(path2 / Rad2Deg);  // 拉飘段开始距离
-    L1 = L2 + (H1 - H2) / tan(path1 / Rad2Deg); // 进场段开始距离
+    L2 = H2 / tan(path2 / Rad2Deg);              // 拉飘开始距离
+    L1 = L2 + (H1 - H2) / tan(path1 / Rad2Deg);  // 陡下滑开始距离
     static double Vt_slope, Vt_0;
 
     switch (ctrl_state) {
         case 0:
-            // level
-            // entry:
-            // theta_g = 2.340;
-            // eng_c = 36.169;
-            // H2 = 2; H1 = 55;
-            // path2 = 1; path1 = 3.5;
-            // %L2 = H2 / tan(deg2rad(path2));
-            // L2 = 114.580;
-            // %L1 = L2 + (H1 - H2) / tan(deg2rad(path1));
-            // L1 = 981.122;
-            // during:
-            // H_g = H1;
-            // Vt_g = Vt;
             theta_cmd = THETA_LEVEL;
             H_cmd = H1;
             speed_cmd = 30;
@@ -195,32 +188,18 @@ void ctrl_approach(void) {
             }
             break;
         case 1:
-            // entry:
-            // theta_g = -1;
-            // eng_c = 5;
-            // Vt_slope = (Vt - 18) / (H1 - H2);
-            // Vt_0 = Vt;
-            // during:
-            // H_g = H2 + (-L - L2) * tan(deg2rad(path1));
-            // Vt_g = Vt_0 - Vt_slope * (H1 - H);
             H_cmd = H2 + (-ac_PN - L2) * tan(path1 / Rad2Deg);
             speed_cmd = Vt_0 - Vt_slope * (H1 - ac_H);
             if (ac_PN > -L2) {
-                theta_cmd = 3;
+                theta_cmd = 4;
                 ac_eng = 0;
                 ctrl_state++;
             }
             break;
         case 2:
-            // entry:
-            // theta_g = 3; eng_c = 0;
-            // during:
-            // H_g = -L * tan(deg2rad(path2));
-            // %H_g = H;
-            // Vt_g = 17;
             H_cmd = -ac_PN * tan(path2 / Rad2Deg);
             speed_cmd = 17;
-            if (ac_H <= 0 || t > 40) flag_Stop = 0;
+            if (ac_H <= 0 || t > 50) flag_Stop = 0;
             break;
         default:
             break;
@@ -285,7 +264,7 @@ void simu_init(void) {
     ac_P = 0 / Rad2Deg;
     ac_Q = 0 / Rad2Deg;
     ac_R = 0 / Rad2Deg;
-    ac_PN = -1100;
+    ac_PN = 0;
     ac_PE = 0.0;
     ac_H = 50;
 
@@ -301,7 +280,8 @@ void simu_init(void) {
     ac_eng = 46.262948302356023;
 }
 
-void CALLBACK Timerdefine(UINT uTimerID, UINT uMsg, DWORD_PTR dwUser, DWORD_PTR dw1, DWORD_PTR dw2) {
+void CALLBACK Timerdefine(UINT uTimerID, UINT uMsg, DWORD_PTR dwUser, DWORD_PTR dw1,
+                          DWORD_PTR dw2) {
     static short cnt = 0;
     cnt++;
     cnt %= 100;
@@ -309,7 +289,7 @@ void CALLBACK Timerdefine(UINT uTimerID, UINT uMsg, DWORD_PTR dwUser, DWORD_PTR 
     simu_run(); /*无人机模型解算 周期5ms*/
 
     if (cnt % 2 == 1) {
-        ctrl_approach(); /*简单的飞行控制*/
+        ctrl_rectangular(); /*简单的飞行控制*/
     }
 }
 
@@ -323,19 +303,29 @@ void main(void) {
     idtimer = timeSetEvent(5, 5, Timerdefine, 0, TIME_PERIODIC);  // 5ms中断一次
 
     fp = fopen("simu.txt", "w");  // openfile
-    fprintf(fp, "t\tVt\tphi\ttheta\tpsi\tPN\tPE\tH\tele\tail\trud\teng\tH_cmd\n");
+    fprintf(fp,
+            "t\tVt\tphi\ttheta\tpsi\tPN\tPE\tH\tele\tail\trud\teng\tH_"
+            "cmd\tspeed_cmd\ttheta_cmd\tH_d\n");
 
     printf("Running simulation! \n");
     while (flag_Stop) {
         Sleep(10);
         count++;
         if (count % 100 == 0) {
-            printf("t: %6.2lf Vt: %6.2lf phi: %6.2lf theta: %6.2lf psi: %6.2lf PN: %8.2lf PE: %8.2lf H: %6.2lf", t,
-                   ac_Vt, ac_phi * Rad2Deg, ac_theta * Rad2Deg, ac_psi * Rad2Deg, ac_PN, ac_PE, ac_H);
-            printf(" | ele: %6.2lf ail: %6.2lf rud: %6.2lf eng: %6.2lf\n", ac_ele, ac_ail, ac_rud, ac_eng);
+            printf(
+                "t: %6.2lf Vt: %6.2lf phi: %6.2lf theta: %6.2lf psi: "
+                "%6.2lf PN: %8.2lf PE: %8.2lf H: %6.2lf",
+                t, ac_Vt, ac_phi * Rad2Deg, ac_theta * Rad2Deg, ac_psi * Rad2Deg,
+                ac_PN, ac_PE, ac_H);
+            printf(" | ele: %6.2lf ail: %6.2lf rud: %6.2lf eng: %6.2lf\n", ac_ele,
+                   ac_ail, ac_rud, ac_eng);
         }
-        fprintf(fp, "%lf\t%lf\t%lf\t%lf\t%lf\t%lf\t%lf\t%lf\t%lf\t%lf\t%lf\t%lf\t%lf\n", t, ac_Vt, ac_phi * Rad2Deg,
-                ac_theta * Rad2Deg, ac_psi * Rad2Deg, ac_PN, ac_PE, ac_H, ac_ele, ac_ail, ac_rud, ac_eng, H_cmd);
+        fprintf(fp,
+                "%lf\t%lf\t%lf\t%lf\t%lf\t%lf\t%lf\t%lf\t%lf\t%lf\t%lf\t%"
+                "lf\t%lf\t%lf\t%lf\t%lf\n",
+                t, ac_Vt, ac_phi * Rad2Deg, ac_theta * Rad2Deg, ac_psi * Rad2Deg,
+                ac_PN, ac_PE, ac_H, ac_ele, ac_ail, ac_rud, ac_eng, H_cmd, speed_cmd,
+                theta_cmd, H_d);
     };
     fclose(fp);
 }

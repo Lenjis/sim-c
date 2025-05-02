@@ -15,12 +15,12 @@ static double SA = 1.3536,               // Wing area [m^2]
 static void uav_density(double H, double VT, double *ru, double *mach);
 static double uav_CD(double alpha_deg);
 static double uav_CL0(double alpha_deg);
-static double uav_CY(void);
 static double uav_CM(double alpha_deg);
 static double uav_interp1(double *A, double idx[], int Len1, double xi);
-static double uav_interp2(double *A, double idx[], int Len1, double xi, double Dim2[], int Len2, double X2);
-static double uav_interp3(double *A, double idx[], int Len1, double xi, double Dim2[], int Len2, double X2,
-                          double Dim3[], int Len3, double X3);
+static double uav_interp2(double *A, double idx[], int Len1, double xi, double Dim2[],
+                          int Len2, double X2);
+static double uav_interp3(double *A, double idx[], int Len1, double xi, double Dim2[],
+                          int Len2, double X2, double Dim3[], int Len3, double X3);
 static int uav_find(double A[], double X, int len);
 
 double ac_dH;
@@ -39,9 +39,11 @@ void model6dof(double t, double x[], double u[], double dx[], int dim) {
 
     const double CL_ele = 0.00636;
     const double CY_beta = -0.00909;
-    const double CR_beta = -0.00600, CR_ail = -0.003618, CR_rud = 0.000144, CR_P = -0.52568, CR_R = 0.01832;
+    const double CR_beta = -0.00600, CR_ail = -0.003618, CR_rud = 0.000144,
+                 CR_P = -0.52568, CR_R = 0.01832;
     const double CM_ele = -0.02052, CM_Q = -9.3136 / 3.0, CM_dalpha = -4.0258;
-    const double CN_beta = 0.00235, CN_ail = 0.000132, CN_rud = -0.00111, CN_P = 0.01792, CN_R = -0.15844;
+    const double CN_beta = 0.00235, CN_ail = 0.000132, CN_rud = -0.00111,
+                 CN_P = 0.01792, CN_R = -0.15844;
 
     Vt = x[0];
     alpha = x[1];
@@ -62,7 +64,6 @@ void model6dof(double t, double x[], double u[], double dx[], int dim) {
     rud = u[2];  // aileron  deflection angle [deg]
     eng = u[3];  // engine input
 
-    // if (Vt < 0.1) Vt = 0.1;
     uav_density(H, Vt, &ru, &mach);  // [air density] [mach number]
     qs = SA * (ru * Vt * Vt / 2);    // [Dynamic pressure](kg/m^2)
 
@@ -87,17 +88,22 @@ void model6dof(double t, double x[], double u[], double dx[], int dim) {
 
     Pow = eng / 100 * (mass * g / 4.0);
 
-    double J[3][3] = {{Ixx, 0, -Ixz}, {0, Iyy, 0}, {-Ixz, 0, Izz}};  // [inertia matrix]
-    double J_inv[3][3] = {{-Izz / (Ixz * Ixz - Ixx * Izz), 0, -Ixz / (Ixz * Ixz - Ixx * Izz)},
-                          {0, 1 / Iyy, 0},
-                          {-Ixz / (Ixz * Ixz - Ixx * Izz), 0, -Ixx / (Ixz * Ixz - Ixx * Izz)}};
-    double S[3][3] = {{calpha * cbeta, -calpha * sbeta, -salpha},
-                      {sbeta, cbeta, 0},
-                      {salpha * cbeta, -salpha * sbeta, calpha}};  // [rotation matrix]
+    double J[3][3] = {
+        {Ixx, 0, -Ixz}, {0, Iyy, 0}, {-Ixz, 0, Izz}};  // [inertia matrix]
+    double J_inv[3][3] = {
+        {-Izz / (Ixz * Ixz - Ixx * Izz), 0, -Ixz / (Ixz * Ixz - Ixx * Izz)},
+        {0, 1 / Iyy, 0},
+        {-Ixz / (Ixz * Ixz - Ixx * Izz), 0, -Ixx / (Ixz * Ixz - Ixx * Izz)}};
+    double S[3][3] = {
+        {calpha * cbeta, -calpha * sbeta, -salpha},
+        {sbeta, cbeta, 0},
+        {salpha * cbeta, -salpha * sbeta, calpha}};  // [rotation matrix]
     double B[3][3] = {
         {ctheta * cpsi, ctheta * spsi, -stheta},
-        {sphi * stheta * cpsi - cphi * spsi, sphi * stheta * spsi + cphi * cpsi, sphi * ctheta},
-        {cphi * stheta * cpsi + sphi * spsi, cphi * stheta * spsi - sphi * cpsi, cphi * ctheta}};  // [rotation matrix]
+        {sphi * stheta * cpsi - cphi * spsi, sphi * stheta * spsi + cphi * cpsi,
+         sphi * ctheta},
+        {cphi * stheta * cpsi + sphi * spsi, cphi * stheta * spsi - sphi * cpsi,
+         cphi * ctheta}};           // [rotation matrix]
     double pqr[3] = {P, Q, R};      // [roll rate] [yaw rate] [pitch rate]
     double Pow_v[3] = {Pow, 0, 0};  // [thrust vector]
 
@@ -115,9 +121,10 @@ void model6dof(double t, double x[], double u[], double dx[], int dim) {
     double F_v[3];
     double Fxyz[3];
     multiply(&S[0][0], F0_v, F_v, 3, 3, 3, 1);  // F = S * [-D; Y; -L]
-    add(Pow_v, F_v, Fxyz, 3, 1);                // Fxyz = [Pow; 0; 0] + S * [-D; Y; -L];
+    add(Pow_v, F_v, Fxyz, 3, 1);  // Fxyz = [Pow; 0; 0] + S * [-D; Y; -L];
 
-    // duvw = Fxyz / mass - cross(pqr, uvw) + g * [-stheta; sphi * ctheta; cphi * ctheta];
+    // duvw = Fxyz / mass - cross(pqr, uvw) + g * [-stheta; sphi * ctheta;
+    // cphi * ctheta];
     double duvw[3] = {Fxyz[0] / mass, Fxyz[1] / mass, Fxyz[2] / mass};
     vector3 pqr_v = {P, Q, R};
     vector3 uvw_v = {U, V, W};
@@ -134,9 +141,13 @@ void model6dof(double t, double x[], double u[], double dx[], int dim) {
     dbeta = (dV * Vt - V * dVt) / (Vt * Vt * cbeta);
     dalpha = (U * dW - W * dU) / (U * U + W * W);
 
-    Lbar = qs * b * (CR_beta * beta_deg + CR_ail * ail + CR_rud * rud + (CR_P * P + CR_R * R) * b / Vt / 2.0);
+    Lbar = qs * b *
+           (CR_beta * beta_deg + CR_ail * ail + CR_rud * rud +
+            (CR_P * P + CR_R * R) * b / Vt / 2.0);
     M = qs * cbar * (CM0 + CM_ele * ele + CM_Q * Q * cbar / Vt / 2.0);
-    N = qs * b * (CN_beta * beta_deg + CN_ail * ail + CN_rud * rud + (CN_P * P + CN_R * R) * b / Vt / 2.0);
+    N = qs * b *
+        (CN_beta * beta_deg + CN_ail * ail + CN_rud * rud +
+         (CN_P * P + CN_R * R) * b / Vt / 2.0);
 
     // dpqr = inv(J) * (-cross(pqr, (J * pqr)) + [Lbar; M; N]);
     double dpqr[3];
@@ -144,8 +155,9 @@ void model6dof(double t, double x[], double u[], double dx[], int dim) {
     multiply(&J[0][0], pqr, v3, 3, 3, 3, 1);  // v3 = J*pqr
     vector3 v3_v = {v3[0], v3[1], v3[2]};
     vector3 c4 = cross(pqr_v, v3_v);
-    double v4[3] = {-c4.x, -c4.y, -c4.z};          // v4 = -pqr x (J*pqr)
-    multiply(&J_inv[0][0], v4, dpqr, 3, 3, 3, 1);  // J_inv * -(pqr x (J*pqr))
+    double v4[3] = {-c4.x, -c4.y, -c4.z};  // v4 = -pqr x (J*pqr)
+    multiply(&J_inv[0][0], v4, dpqr, 3, 3, 3,
+             1);  // J_inv * -(pqr x (J*pqr))
     double v5[3] = {Lbar, M, N};
     add(dpqr, v5, dpqr, 3, 1);  // dpqr = J_inv*(pqr x (J*pqr)) + [Lbar,M,N]
     dP = dpqr[0];
@@ -181,8 +193,7 @@ void model6dof(double t, double x[], double u[], double dx[], int dim) {
 }
 
 // Return air density and mach number
-//=============================================================================
-
+//===================================
 static void uav_density(double H, double VT, double *ru, double *mach) {
     double T, PP, RR, TS, sonic;
     const double K = 34.163195;
@@ -219,35 +230,39 @@ static void uav_density(double H, double VT, double *ru, double *mach) {
     RR = PP / (T / 288.15);
     TS = T / 288.15;
     sonic = AL * sqrt(TS);
-
     *ru = RL * RR;
     *mach = VT / sonic;
 }
 
 // return drag coefficient
-//=============================================================================
+//========================
 static double uav_CD(double alpha_deg) {
     static double IDX_alpha[9] = {-4.0, -2.0, 0.0, 2.0, 4.0, 8.0, 12.0, 16.0, 20.0};
-    static double TBL_CD[9] = {0.026, 0.024, 0.024, 0.028, 0.036, 0.061, 0.102, 0.141, 0.173};
+    static double TBL_CD[9] = {0.026, 0.024, 0.024, 0.028, 0.036,
+                               0.061, 0.102, 0.141, 0.173};
     return uav_interp1(TBL_CD, IDX_alpha, 9, alpha_deg);
 }
 
 // return lift coefficient
-//=============================================================================
+//========================
 static double uav_CL0(double alpha_deg) {
     static double IDX_alpha[9] = {-4.0, -2.0, 0.0, 2.0, 4.0, 8.0, 12.0, 16.0, 20.0};
-    static double TBL_CL0[9] = {-0.219, -0.04, 0.139, 0.299, 0.455, 0.766, 1.083, 1.409, 1.743};
+    static double TBL_CL0[9] = {-0.219, -0.04, 0.139, 0.299, 0.455,
+                                0.766,  1.083, 1.409, 1.743};
     return uav_interp1(TBL_CL0, IDX_alpha, 9, alpha_deg);
 }
 
-static double uav_CY() { return -0.00909; }
-
+// return moment coefficient
+//==========================
 static double uav_CM(double alpha_deg) {
     static double IDX_alpha[9] = {-4.0, -2.0, 0.0, 2.0, 4.0, 8.0, 12.0, 16.0, 20.0};
-    static double TBL_CM0[9] = {0.1161, 0.0777, 0.0393, 0.0009, -0.0375, -0.0759, -0.1527, -0.2295, -0.3063};
+    static double TBL_CM0[9] = {0.1161,  0.0777,  0.0393,  0.0009, -0.0375,
+                                -0.0759, -0.1527, -0.2295, -0.3063};
     return uav_interp1(TBL_CM0, IDX_alpha, 9, alpha_deg);
 }
 
+// 1D interpolation
+//=================
 static double uav_interp1(double *A, double idx[], int Len1, double xi) {
     int r;
     double DA, Y;
@@ -259,6 +274,8 @@ static double uav_interp1(double *A, double idx[], int Len1, double xi) {
     return (Y);
 }
 
+// find the index of the nearest point
+//====================================
 static int uav_find(double A[], double X, int len) {
     int result = 0;
     int i, P_Start, P_End;

@@ -2,10 +2,10 @@
 <Project>
   <ProjectOutputs>
     <ProjectOutput>
-      <FullPath>C:\Users\rzxha\Documents\Courses\飞行控制\uav-sim\build\Debug\ZERO_CHECK</FullPath>
+      <FullPath>C:\Projects\uav-sim-msvc\build\Debug\ZERO_CHECK</FullPath>
     </ProjectOutput>
     <ProjectOutput>
-      <FullPath>C:\Users\rzxha\Documents\Courses\飞行控制\uav-sim\build\Debug\flight_sim.exe</FullPath>
+      <FullPath>C:\Projects\uav-sim-msvc\build\Debug\flight_sim.exe</FullPath>
     </ProjectOutput>
   </ProjectOutputs>
   <ContentFiles />
