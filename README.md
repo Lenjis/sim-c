@@ -1,5 +1,5 @@
 # uav-sim
-an embedded UAV 6-DOF control and simulation model.
+an UAV 6-DOF control and simulation model based on MSVC.
 
 ## Aircraft Parameters
 - **Wing Area:** 1.3536 m²
